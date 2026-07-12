@@ -287,6 +287,207 @@ nano /etc/fstab
 ```text
 UUID=2af3-67bc    /database    ext4    defaults    0 0
 ```
+**Format:**
+```
+UUID/Filepath   MountPoint   FileSystem   MountOption   DumpFlag   FlagSystemCheckOrder
+```
+
+**Field 1**
+
+What is UUID?
+
+UUID means:
+
+Universally Unique Identifier
+
+Every filesystem created by Linux receives its own unique identifier.
+
+Example:
+
+blkid
+
+Output:
+```
+/dev/sdb1:
+UUID="2af3-67bc"
+TYPE="ext4"
+```
+Linux uses the UUID because:
+
+Imagine this.
+
+Today:
+```
+sdb1
+```
+Tomorrow after adding another disk:
+```
+sdc1
+```
+The device name changed.
+
+But...
+
+The UUID never changes.
+
+Using UUID is therefore much safer than writing:
+```
+/dev/sdb1
+```
+
+**Field 2**
+
+This is called the:
+
+Mount Point
+
+Meaning:
+
+"Where should Linux attach this filesystem?"
+
+Suppose:
+```
+UUID=2af3-67bc
+```
+is your 100GB disk.
+
+After mounting:
+```
+/database
+```
+Everything inside that disk becomes accessible through:
+
+cd /database
+
+**Field 3**
+
+Filesystem Type.
+
+Linux needs to know:
+
+"How should I read this storage?"
+
+Examples:
+
+- ext4
+- xfs
+- btrfs
+- vfat
+- ntfs
+- swap
+
+For example:
+
+UUID=xxxx
+
+none
+
+swap
+
+sw
+
+0
+
+0
+
+would activate Swap during boot.
+
+**Field 4**
+
+Mount Options.
+
+Think of this as:
+
+"How should Linux mount this filesystem?"
+
+The keyword:
+
+defaults
+
+actually represents several commonly used options.
+
+Equivalent to:
+```
+rw,suid,dev,exec,auto,nouser,async
+```
+Meaning:
+
+Option	Meaning
+rw	Read & Write
+suid	Allow SUID programs
+dev	Allow device files
+exec	Allow executing programs
+auto	Automatically mount during boot
+nouser	Only root can mount
+async	Normal asynchronous writing
+
+Most of the time:
+
+defaults
+
+is all you need.
+
+**Field 5**
+
+Dump Flag.
+
+Years ago Linux had a backup utility called:
+
+dump
+
+It used this field.
+
+Nowadays?
+
+Almost nobody uses it.
+
+So you'll almost always see:
+
+0
+
+Meaning:
+
+Don't use dump backup.
+
+**Field 6**
+
+Filesystem Check Order.
+
+This field tells Linux:
+
+"When should fsck check this filesystem during boot?"
+
+Values:
+
+0
+
+↓
+
+Never check
+1
+
+↓
+
+Check FIRST
+
+Normally only:
+
+/
+
+gets:
+
+1
+
+because it is the Root Filesystem.
+
+Other disks:
+
+2
+
+Meaning:
+
+Check after Root.
+```
 Linux will automatically mount the filesystem during boot.
 
 ---
