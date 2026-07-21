@@ -1,189 +1,208 @@
-# Phase 2 — Configuring Nginx Virtual Hosts
+# Phase 2 — Creating Multiple Nginx Virtual Hosts
 
 ## Objective
 
-The objective of this phase is to configure Nginx Virtual Hosts that allow a single Linux server to host multiple websites.
+The objective of this phase is to configure Nginx to host multiple websites on a single CentOS Stream 9 server.
 
-A production web server commonly hosts multiple applications or department websites on the same infrastructure.
+In the previous project, Nginx was configured as a single web server hosting one website.
 
-Instead of deploying separate servers, Nginx can use server blocks to determine which website should respond to incoming requests.
+For this project, ABC Solutions requires multiple internal websites to run on the same server:
 
-In this phase, Nginx will be configured to host:
+- Company Portal
+- HR Department Portal
+- IT Department Portal
 
-- company.local
-- hr.company.local
-- it.company.local
+Instead of deploying separate servers, Nginx will be configured with multiple server blocks to serve different website content depending on the requested domain name.
 
-Each website will have:
+---
 
-- Its own domain name.
-- Its own document root.
-- Its own Nginx configuration.
+# Starting Point
+
+At the beginning of this phase, the server already contains:
+
+- Installed Nginx
+- Running Nginx service
+- Existing SSL configuration from Project 1
+- Working HTTPS web server
+
+Verification:
+
+```bash
+systemctl status nginx
+```
+
+Expected:
+
+```
+active (running)
+```
 
 ---
 
 # Production Scenario
 
-ABC Solutions has completed the initial website directory design.
+ABC Solutions currently has one Linux web server.
 
-The Linux server currently contains:
+The company wants to host three internal websites:
 
 ```
-/var/www/
+company.local
+
+hr.company.local
+
+it.company.local
+```
+
+The requirement:
+
+- Use the existing CentOS server.
+- Avoid deploying additional servers.
+- Separate each website's content.
+- Allow Nginx to route requests correctly.
+
+The final design:
+
+```
+                Client Browser
+
+                      |
+                      |
+                      ↓
+
+                Nginx Server
+
+                      |
+        --------------------------------
+
+        |              |               |
+
+        ↓              ↓               ↓
+
+
+ company.local   hr.company.local   it.company.local
+
+
+ /var/www/       /var/www/          /var/www/
+ company        hr                 it
+
+```
+
+---
+
+# Creating Website Directories
+
+The first step was creating separate directories for each website.
+
+Command:
+
+```bash
+mkdir -p /var/www/company
+mkdir -p /var/www/hr
+mkdir -p /var/www/it
+```
+
+Result:
+
+```
+/var/www
 
 ├── company
 ├── hr
 └── it
 ```
 
-The next requirement is configuring Nginx so users can access:
+---
 
-```
-https://company.local
-https://hr.company.local
-https://it.company.local
-```
+# Creating Test Website Content
 
-The administrator must configure Nginx to correctly identify each request and serve the appropriate website.
+Each directory received its own test page.
+
+This allows verification that Nginx is serving the correct website.
 
 ---
 
-# Understanding Nginx Virtual Hosts
+## Company Website
 
-A Virtual Host allows one web server to host multiple websites.
-
-In Nginx, this is implemented using:
+Location:
 
 ```
-server {}
+/var/www/company/index.html
 ```
-
-blocks.
 
 Example:
 
+```html
+<h1>ABC Solutions</h1>
+
+<p>Welcome to Company Portal</p>
 ```
-Nginx Server
-
-        |
-        |
-        ↓
-
-server {}
-
-company.local
-
-        |
-
-server {}
-
-hr.company.local
-
-        |
-
-server {}
-
-it.company.local
-```
-
-Each server block contains rules defining:
-
-- Where the website files exist.
-- Which domain should match.
-- Which port should be used.
-- How requests should be handled.
 
 ---
 
-# How Nginx Selects a Website
+## HR Website
 
-When a browser sends a request:
+Location:
+
+```
+/var/www/hr/index.html
+```
 
 Example:
 
-```
-https://hr.company.local
-```
+```html
+<h1>Human Resources</h1>
 
-The browser sends:
-
-```
-Destination Port: 443
-
-Host Header:
-hr.company.local
-```
-
-Nginx performs matching:
-
-```
-Incoming Request
-
-        |
-        ↓
-
-Listening Port
-
-        |
-        ↓
-
-server_name Match
-
-        |
-        ↓
-
-Correct server block selected
-
-        |
-        ↓
-
-Website content returned
+<p>Welcome to HR Portal</p>
 ```
 
 ---
 
-# Nginx Configuration Location
+## IT Website
 
-CentOS Stream 9 stores additional Nginx configurations in:
-
-```
-/etc/nginx/conf.d/
-```
-
-Files inside this directory are automatically loaded because:
+Location:
 
 ```
-/etc/nginx/nginx.conf
+/var/www/it/index.html
 ```
 
-contains:
+Example:
+
+```html
+<h1>IT Department</h1>
+
+<p>Welcome to IT Portal</p>
+```
+
+---
+
+# Creating Nginx Server Blocks
+
+Nginx uses:
 
 ```nginx
-include /etc/nginx/conf.d/*.conf;
+server {
+
+}
 ```
 
----
+blocks to define website behavior.
 
-# Creating Virtual Host Configurations
+Each website requires its own configuration.
 
-The following configuration files will be created:
+The configuration files are stored inside:
 
 ```
 /etc/nginx/conf.d/
-
-├── company.conf
-├── hr.conf
-└── it.conf
 ```
 
 ---
 
 # Company Virtual Host
 
-Create:
+Created:
 
-```bash
-vi /etc/nginx/conf.d/company.conf
+```
+/etc/nginx/conf.d/company.conf
 ```
 
 Configuration:
@@ -191,16 +210,16 @@ Configuration:
 ```nginx
 server {
 
-    listen 443 ssl;
-    listen [::]:443 ssl;
+   listen 443 ssl;
+   listen [::]:443 ssl;
 
-    server_name company.local;
+   server_name company.local;
 
-    root /var/www/company;
-    index index.html;
+   root /var/www/company;
+   index index.html;
 
-    ssl_certificate /etc/nginx/ssl/nginx.crt;
-    ssl_certificate_key /etc/nginx/ssl/nginx.key;
+   ssl_certificate      /etc/nginx/ssl/nginx.crt;
+   ssl_certificate_key  /etc/nginx/ssl/nginx.key;
 
 }
 ```
@@ -209,10 +228,10 @@ server {
 
 # HR Virtual Host
 
-Create:
+Created:
 
-```bash
-vi /etc/nginx/conf.d/hr.conf
+```
+/etc/nginx/conf.d/hr.conf
 ```
 
 Configuration:
@@ -220,16 +239,16 @@ Configuration:
 ```nginx
 server {
 
-    listen 443 ssl;
-    listen [::]:443 ssl;
+   listen 443 ssl;
+   listen [::]:443 ssl;
 
-    server_name hr.company.local;
+   server_name hr.company.local;
 
-    root /var/www/hr;
-    index index.html;
+   root /var/www/hr;
+   index index.html;
 
-    ssl_certificate /etc/nginx/ssl/nginx.crt;
-    ssl_certificate_key /etc/nginx/ssl/nginx.key;
+   ssl_certificate      /etc/nginx/ssl/nginx.crt;
+   ssl_certificate_key  /etc/nginx/ssl/nginx.key;
 
 }
 ```
@@ -238,10 +257,10 @@ server {
 
 # IT Virtual Host
 
-Create:
+Created:
 
-```bash
-vi /etc/nginx/conf.d/it.conf
+```
+/etc/nginx/conf.d/it.conf
 ```
 
 Configuration:
@@ -249,47 +268,25 @@ Configuration:
 ```nginx
 server {
 
-    listen 443 ssl;
-    listen [::]:443 ssl;
+   listen 443 ssl;
+   listen [::]:443 ssl;
 
-    server_name it.company.local;
+   server_name it.company.local;
 
-    root /var/www/it;
-    index index.html;
+   root /var/www/it;
+   index index.html;
 
-    ssl_certificate /etc/nginx/ssl/nginx.crt;
-    ssl_certificate_key /etc/nginx/ssl/nginx.key;
+   ssl_certificate      /etc/nginx/ssl/nginx.crt;
+   ssl_certificate_key  /etc/nginx/ssl/nginx.key;
 
 }
 ```
 
 ---
 
-# Configuration Breakdown
+# Understanding the Configuration
 
-## listen directive
-
-Example:
-
-```nginx
-listen 443 ssl;
-```
-
-Defines:
-
-- TCP port.
-- Protocol type.
-- SSL usage.
-
-Meaning:
-
-```
-Accept HTTPS connections on port 443
-```
-
----
-
-## server_name directive
+## server_name
 
 Example:
 
@@ -297,23 +294,19 @@ Example:
 server_name hr.company.local;
 ```
 
-Defines which hostname should match this server block.
+Defines which hostname should match this website.
 
-Incoming request:
-
-```
-Host: hr.company.local
-```
-
-matches:
+When the browser requests:
 
 ```
-server_name hr.company.local
+https://hr.company.local
 ```
+
+Nginx checks the request hostname and selects the matching server block.
 
 ---
 
-## root directive
+## root
 
 Example:
 
@@ -321,12 +314,12 @@ Example:
 root /var/www/hr;
 ```
 
-Defines where website files are stored.
+Defines where website files are located.
 
 Request:
 
 ```
-GET /
+https://hr.company.local/
 ```
 
 becomes:
@@ -337,7 +330,7 @@ becomes:
 
 ---
 
-## index directive
+## index
 
 Example:
 
@@ -345,25 +338,11 @@ Example:
 index index.html;
 ```
 
-Defines the default file returned when requesting a directory.
-
-Example:
-
-Request:
-
-```
-https://hr.company.local/
-```
-
-Nginx searches:
-
-```
-/var/www/hr/index.html
-```
+Defines the default file returned when accessing a directory.
 
 ---
 
-# Testing Nginx Configuration
+# Validating Configuration
 
 Before applying changes:
 
@@ -375,203 +354,157 @@ Expected:
 
 ```
 syntax is ok
+
 test is successful
 ```
 
-This prevents broken configurations from being loaded.
-
 ---
 
-# Reloading Nginx
+# Applying Changes
 
-Apply the new configuration:
+Reload Nginx:
 
 ```bash
 systemctl reload nginx
 ```
 
-Why reload instead of restart?
+Why reload?
 
-Reload:
+Because the service is already running.
 
-- Keeps existing connections.
-- Loads new configuration.
-- Minimizes service interruption.
+Reloading allows Nginx to:
 
-Restart:
+- Read the new configuration.
+- Keep existing connections.
+- Avoid unnecessary downtime.
 
-- Stops and starts the service.
-- Can interrupt active users.
+---
 
-Production administrators prefer reload whenever possible.
+# Domain Resolution Testing
+
+Since this is a local lab environment, DNS records were not available.
+
+Instead, hostname resolution was temporarily configured using:
+
+```
+/etc/hosts
+```
+
+Example:
+
+```
+192.168.x.x company.local
+
+192.168.x.x hr.company.local
+
+192.168.x.x it.company.local
+```
+
+This allowed the client machine to resolve the internal domains.
 
 ---
 
 # Verification
 
-Check listening ports:
+Testing:
 
-```bash
-ss -tlnp | grep nginx
+```
+https://company.local
 ```
 
 Expected:
 
 ```
-LISTEN 0 511 0.0.0.0:443 nginx
+ABC Solutions
+Welcome to Company Portal
 ```
 
 ---
 
-Verify loaded configuration:
-
-```bash
-nginx -T
-```
-
-Confirm:
+Testing:
 
 ```
-server_name company.local;
+https://hr.company.local
+```
 
-server_name hr.company.local;
+Expected:
 
-server_name it.company.local;
+```
+Human Resources Department
+Welcome to HR Portal
+```
+
+---
+
+Testing:
+
+```
+https://it.company.local
+```
+
+Expected:
+
+```
+IT Department
+Welcome to IT Portal
 ```
 
 ---
 
 # Troubleshooting
 
-## Problem: Wrong website appears
+## Issue: Website returns 403 Forbidden
 
-Example:
+During testing, the websites returned:
 
 ```
-Request:
-
-https://hr.company.local
-
-Shows:
-
-company.local website
+403 Forbidden
 ```
 
-Possible causes:
+Initial investigation checked:
 
-- Incorrect server_name.
-- Missing DNS/hosts entry.
-- Default server responding.
+- File existence.
+- Ownership.
+- Unix permissions.
 
-Investigation:
+Commands:
 
 ```bash
-nginx -T
+ls -ld /var/www/company
+
+ls -l /var/www/company
 ```
 
-Verify:
+Files existed and permissions appeared correct.
 
-```nginx
-server_name hr.company.local;
-```
+Further investigation continued into SELinux.
 
----
-
-## Problem: Nginx configuration fails
-
-Check:
-
-```bash
-nginx -t
-```
-
-Common causes:
-
-- Missing semicolon.
-- Incorrect file path.
-- Duplicate directives.
-
----
-
-## Problem: Website returns 403 Forbidden
-
-Possible causes:
-
-- Linux permissions.
-- SELinux restrictions.
-
-Investigation:
-
-```bash
-ls -l /var/www/hr
-```
-
-and:
-
-```bash
-ls -Z /var/www/hr
-```
-
-SELinux troubleshooting is covered in Phase 4.
+This issue is documented in Phase 4.
 
 ---
 
 # Verification Checklist
 
-| Check | Status |
+| Check | Result |
 |-|-|
-| Virtual Host files created | ✅ |
-| Nginx configuration validated | ✅ |
-| Nginx reloaded successfully | ✅ |
-| Port 443 listening | ✅ |
-| Domains mapped correctly | ✅ |
-| Websites separated correctly | ✅ |
-
----
-
-# Production Considerations
-
-Real enterprise environments commonly use:
-
-```
-/etc/nginx/conf.d/
-
-company.conf
-api.conf
-portal.conf
-application.conf
-```
-
-or:
-
-```
-/etc/nginx/sites-available/
-```
-
-and:
-
-```
-/etc/nginx/sites-enabled/
-```
-
-The goal is the same:
-
-- Keep configurations organized.
-- Separate applications.
-- Simplify troubleshooting.
+| Website directories created | ✅ |
+| HTML files created | ✅ |
+| Nginx server blocks created | ✅ |
+| Configuration validated | ✅ |
+| Nginx reloaded | ✅ |
+| Multiple websites configured | ✅ |
 
 ---
 
 # Key Takeaways
 
-This phase demonstrated how Nginx can host multiple websites using Virtual Hosts.
+This phase demonstrated how one Nginx server can host multiple websites without deploying additional servers.
 
-Important concepts learned:
+The important concepts learned:
 
-- One Nginx process can host many websites.
-- Server blocks define website behavior.
-- `server_name` controls hostname matching.
-- `root` controls content location.
-- Configuration validation prevents production outages.
+- Nginx uses server blocks to separate websites.
+- Each website can have its own document root.
+- `server_name` determines which website responds.
+- Existing infrastructure can be expanded instead of replaced.
 
-The next phase will secure these websites using HTTPS and SSL/TLS certificates.
+The next phase focuses on HTTPS verification and understanding why HTTP and HTTPS behaved differently during testing.
