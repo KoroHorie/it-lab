@@ -300,9 +300,151 @@ Commonly used for service accounts that are not intended for interactive logins.
 
 ---
 
+### Set Account Expiration Date
+
+```bash
+chage -E YYYY-MM-DD username
+```
+
+Example:
+
+```bash
+chage -E 2026-12-31 john
+```
+
+Purpose:
+
+Automatically disables the account after the specified date.
+
+Commonly used for:
+
+- Contractors
+- Vendors
+- Temporary employees
+- Interns
+
+---
+
+### Remove Account Expiration
+
+```bash
+chage -E -1 username
+```
+
+Example:
+
+```bash
+chage -E -1 john
+```
+
+Purpose:
+
+Removes the account expiration date, allowing the account to remain active indefinitely.
+
+---
+
+# Understanding the Difference
+
+Although both are managed by `chage`, **password expiration** and **account expiration** are completely different concepts.
+
+## Password Expiration
+
+The account remains active.
+
+The user can still authenticate, but Linux immediately requires the password to be changed before allowing access.
+
+Example:
+
+- Employee password reaches 90 days.
+- User enters the correct password.
+- Linux prompts:
+
+```
+Your password has expired.
+You must change your password now.
+```
+
+The user changes the password and continues working.
+
+---
+
+## Account Expiration
+
+The account itself becomes inactive.
+
+Linux stops the login process immediately.
+
+The user cannot:
+
+- Log in
+- Change the password
+- Authenticate using the account
+
+Example:
+
+A contractor is only employed until:
+
+```
+2026-12-31
+```
+
+The administrator configures:
+
+```bash
+chage -E 2026-12-31 john
+```
+
+Beginning on January 1, 2027, Linux automatically rejects all login attempts because the account has expired.
+
+No administrator intervention is required.
+
+---
+
+## Production Use Cases
+
+### Password Expiration
+
+Common for:
+
+- Employees
+- Administrators
+- Standard user accounts
+
+Purpose:
+
+Enforce regular password rotation according to company security policies.
+
+---
+
+### Account Expiration
+
+Common for:
+
+- Contractors
+- Interns
+- Vendors
+- Temporary consultants
+
+Purpose:
+
+Automatically disable access after a known employment end date.
+
+---
+
+# Password Expiration vs Account Expiration
+
+| Password Expiration | Account Expiration |
+|----------------------|--------------------|
+| User can still log in | Login is denied immediately |
+| Linux forces password change | Linux blocks authentication |
+| Account remains active | Account becomes inactive |
+| Managed by `-M`, `-W`, `-d` | Managed by `-E` |
+
+---
+
 # Production Takeaways
 
-`chage` manages password aging and expiration policies.
+`chage` manages password aging and account expiration policies.
 
 Common commands used by Linux administrators:
 
@@ -311,9 +453,10 @@ chage -l username
 chage -d 0 username
 chage -M 90 username
 chage -W 7 username
+chage -E YYYY-MM-DD username
 ```
 
-Instead of manually reading `/etc/shadow`, administrators usually start troubleshooting password expiration issues with:
+Instead of manually reading `/etc/shadow`, administrators usually start troubleshooting password expiration or account expiration issues with:
 
 ```bash
 chage -l username
@@ -341,4 +484,6 @@ chage -d
 chage -M
 
 chage -W
+
+chage -E
 ```
