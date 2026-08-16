@@ -12,7 +12,7 @@
 - **Virtual Machines**
   - AD-Srv
   - RDS-Srv
-- Operating System: Windows Server 2019
+- **Operating System: Windows Server 2019**
 - **Active Directory Users and Computers**
   - OU: Remote-Users
   - Users (Atleast 2)
