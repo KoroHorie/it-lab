@@ -1,57 +1,120 @@
-## Proxmox GPU Passthrough
+# Proxmox GPU Passthrough
 
 ## Phase 1 - Checking GPU IOMMU Group
-1. Find the PCI address of the GPU (RTX 3060).
 
-`lspci`
+### 1. Find the PCI address of the GPU (RTX 3060)
 
-`01:00.0 VGA compatible controller: NVIDIA Corporation GA104 [GeForce RTX 3060] (rev a1)`
-`01:00.1 Audio device: NVIDIA Corporation GA104 High Definition Audio Controller (rev a1)`
+Run:
 
-2. For a VM passthrough, we generally want to pass both 01:00.0 and 01:00.1 to the same VM. The .1 function is the HDMI/DisplayPort audio device from the GPU
+```bash
+lspci
+```
 
-3. The next thing we need to determine is whether the RTX 3060 is isolated in its own IOMMU group.
-Run: `find /sys/kernel/iommu_groups/ -type 1`
+Output:
 
-`/sys/kernel/iommu_groups/9/devices/0000:01:00.0`
-`/sys/kernel/iommu_groups/9/devices/0000:01:00.1`
+```text
+01:00.0 VGA compatible controller: NVIDIA Corporation GA104 [GeForce RTX 3060] (rev a1)
+01:00.1 Audio device: NVIDIA Corporation GA104 High Definition Audio Controller (rev a1)
+```
 
-A better way to identify the IOMMU Group of the GPU, we can use this:
+### 2. Identify the GPU Functions
 
+For VM passthrough, we generally want to pass both `01:00.0` and `01:00.1` to the same VM.
+
+- `01:00.0` → RTX 3060 GPU
+- `01:00.1` → NVIDIA HDMI/DisplayPort Audio
+
+The `.1` function is the GPU's audio device and should normally be passed through together with the GPU.
+
+### 3. Check the GPU's IOMMU Group
+
+Determine whether the RTX 3060 is isolated in its own IOMMU group.
+
+Run:
+
+```bash
+find /sys/kernel/iommu_groups/ -type l
+```
+
+Relevant output:
+
+```text
+/sys/kernel/iommu_groups/9/devices/0000:01:00.0
+/sys/kernel/iommu_groups/9/devices/0000:01:00.1
+```
+
+A better way to identify the devices belonging to each IOMMU group is:
+
+```bash
 for g in /sys/kernel/iommu_groups/*; do
     echo "IOMMU Group ${g##*/}:"
     for d in "$g"/devices/*; do
         lspci -nns "${d##*/}"
     done
     echo
-done`
+done
+```
 
-which it will display something like this:
+Relevant output:
 
-`IOMMU Group 9:`
-`01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA104 [GeForce RTX 3060] [10de:2487] (rev a1)`
-`01:00.1 Audio device [0403]: NVIDIA Corporation GA104 High Definition Audio Controller [10de:228b] (rev a1)`
+```text
+IOMMU Group 9:
+01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA104 [GeForce RTX 3060] [10de:2487] (rev a1)
+01:00.1 Audio device [0403]: NVIDIA Corporation GA104 High Definition Audio Controller [10de:228b] (rev a1)
+```
 
-4. We also need to determine the current driver owned by the GPU
+This confirms that both RTX 3060 functions are in **IOMMU Group 9** and that the group contains only the GPU and its audio function.
 
-`lspci -nnk -s 01:00.0`
+### 4. Check the Current Driver
 
+Check which driver currently owns the GPU:
+
+```bash
+lspci -nnk -s 01:00.0
+```
+
+Output:
+
+```text
 01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA104 [GeForce RTX 3060] [10de:2487] (rev a1)
         Subsystem: Micro-Star International Co., Ltd. [MSI] Device [1462:397d]
         Kernel driver in use: nouveau
         Kernel modules: nvidiafb, nouveau, nova_core
+```
 
-`lspci -nnk -s 01:00.1`
+Check the GPU audio device:
 
+```bash
+lspci -nnk -s 01:00.1
+```
+
+Output:
+
+```text
 01:00.1 Audio device [0403]: NVIDIA Corporation GA104 High Definition Audio Controller [10de:228b] (rev a1)
         Subsystem: Micro-Star International Co., Ltd. [MSI] Device [1462:397d]
         Kernel driver in use: snd_hda_intel
         Kernel modules: snd_hda_intel
+```
 
-5. Checking whether IOMMU is actually enabled
+At this point, the host is currently using:
 
-`dmesg | grep -Ei 'iommu|amd-vi'`
+```text
+01:00.0 → nouveau
+01:00.1 → snd_hda_intel
+```
 
+The GPU must later be detached from these host drivers and assigned to `vfio-pci`.
+
+### 5. Verify That IOMMU Is Enabled
+
+Run:
+
+```bash
+dmesg | grep -Ei 'iommu|amd-vi'
+```
+
+```text
 [    0.160946] AMD-Vi: Using global IVHD EFR:0x206d73ef22254ade, EFR2:0x0
 [    0.410466] iommu: Default domain type: Translated
 [    0.410466] iommu: DMA domain TLB invalidation policy: lazy mode
@@ -94,23 +157,55 @@ which it will display something like this:
 [    0.452669] AMD-Vi: X2APIC enabled
 [    0.672579] AMD-Vi: Virtual APIC enabled
 [    0.673907] perf/amd_iommu: Detected AMD IOMMU #0 (2 banks, 4 counters/bank).
+```
 
-## Phase 2 - VFIO Configuration 
+```text
+AMD-Vi: Using global IVHD EFR:0x206d73ef22254ade, EFR2:0x0
+iommu: Default domain type: Translated
+iommu: DMA domain TLB invalidation policy: lazy mode
+pci 0000:01:00.0: Adding to iommu group 9
+pci 0000:01:00.1: Adding to iommu group 9
+AMD-Vi: Interrupt remapping enabled
+AMD-Vi: X2APIC enabled
+AMD-Vi: Virtual APIC enabled
+perf/amd_iommu: Detected AMD IOMMU #0 (2 banks, 4 counters/bank).
+```
 
-Pre-requisites checklists:
+The important entries are:
 
-✅ AMD IOMMU enabled
-✅ Interrupt remapping enabled
-✅ RTX 3060 detected at 01:00.0
-✅ GPU audio at 01:00.1
-✅ Both are in IOMMU Group 9
-✅ Group 9 contains only those two functions
-⚠️ Host currently uses nouveau → we need to detach it and bind the GPU to vfio-pci
+```text
+pci 0000:01:00.0: Adding to iommu group 9
+pci 0000:01:00.1: Adding to iommu group 9
+AMD-Vi: Interrupt remapping enabled
+```
 
-1. Check loaded GPU modules
+This confirms that AMD IOMMU is enabled and the RTX 3060 devices have been assigned to IOMMU Group 9.
 
-`lsmod | grep -E 'nouveau|nvidia'`
+---
 
+## Phase 2 - VFIO Configuration
+
+### Pre-requisites Checklist
+
+- ✅ AMD IOMMU enabled
+- ✅ Interrupt remapping enabled
+- ✅ RTX 3060 detected at `01:00.0`
+- ✅ GPU audio detected at `01:00.1`
+- ✅ Both devices are in IOMMU Group 9
+- ✅ IOMMU Group 9 contains only the RTX 3060 functions
+- ⚠️ Host currently uses `nouveau` → GPU needs to be detached and bound to `vfio-pci`
+
+### 1. Check Loaded GPU Modules
+
+Run:
+
+```bash
+lsmod | grep -E 'nouveau|nvidia'
+```
+
+Output:
+
+```text
 nouveau              2969600  0
 gpu_sched              69632  1 nouveau
 drm_gpuvm              53248  1 nouveau
@@ -122,87 +217,124 @@ drm_display_helper    286720  1 nouveau
 i2c_algo_bit           16384  1 nouveau
 video                  77824  1 nouveau
 wmi                    32768  5 video,gigabyte_wmi,wmi_bmof,mxm_wmi,nouveau
+```
 
-This output tells us that nouveau has been loaded
+This confirms that `nouveau` is currently loaded.
 
-`lsof /dev/nvidia* 2>/dev/null`
-return 0
+Check whether any NVIDIA device files are in use:
 
-`ls -l /dev/dri/`
+```bash
+lsof /dev/nvidia* 2>/dev/null
+```
+
+No output is expected.
+
+Check the DRM devices:
+
+```bash
+ls -l /dev/dri/
+```
+
+Example output:
+
+```text
 total 0
 drwxr-xr-x 2 root root         80 Aug 13 19:37 by-path
 crw-rw---- 1 root video  226,   0 Aug 13 19:37 card0
 crw-rw---- 1 root render 226, 128 Aug 13 19:37 renderD128
+```
 
-card0 and renderD128 are being provided by the DRM stack so these are most likely nouveau
+The goal is to remove the RTX 3060 from the host's `nouveau` driver and assign it to `vfio-pci` so it can be passed through to a VM.
 
-What we're going to do is we need to take out RTX 3060 from using nouveau from Linux host and transition it to make the RTX 3060 to passthrough its PCI to VM via vfio-pci.
+Because the GPU is isolated in IOMMU Group 9, no ACS override is required.
 
-The GPU is isolated in IOMMU Group 9 so we don't need any ACS override or other questionable workarounds.
+### 2. Blacklist nouveau
 
-2. Blacklisting nouveau
+Create the blacklist configuration:
 
-Create a blacklist configuration:
-`nano /etc/modprobe.d/blacklist-nouveau.conf`
+```bash
+nano /etc/modprobe.d/blacklist-nouveau.conf
+```
 
-Configure the following inside blacklist-nouveau.conf
+Add:
 
+```text
 blacklist nouveau
 options nouveau modeset=0
+```
 
-Then we need to make sure VFIO modules are available, to check that run:
+### 3. Configure vfio-pci
 
-`lsmod | grep vfio`
+Identify the PCI device IDs:
 
-It is expected that there's no output, they are not loaded yet.
-
-3. Identify the PCI IDs
-
-The IDs are:
-
+```text
 10de:2487 → RTX 3060 GPU
 10de:228b → RTX 3060 Audio
+```
 
-We'll use these IDs to tell vfio-pci that they are belong to VFIO. To do that we need to create a vfio configuration file
+Create the VFIO configuration:
 
-`nano /etc/modprobe.d/vfio.conf`
+```bash
+nano /etc/modprobe.d/vfio.conf
+```
 
-And put this inside:
+Add:
 
-`options vfio-pci ids=10de:2487,10de:228b`
+```text
+options vfio-pci ids=10de:2487,10de:228b
+```
 
-Then we'll rebuild the initramfs so the configuration is applied early during boot.
+Verify both configurations:
 
-cat /etc/modprobe.d/blacklist-nouveau.conf && cat /etc/modprobe.d/vfio.conf 
+```bash
+cat /etc/modprobe.d/blacklist-nouveau.conf
+cat /etc/modprobe.d/vfio.conf
+```
+
+Expected:
+
+```text
 blacklist nouveau
 options nouveau modeset=0
+
 options vfio-pci ids=10de:2487,10de:228b
+```
 
-In this configuration, we're telling the host to not load the nouveau and never initialize nouveau modsetting.
+This configuration prevents the host from loading `nouveau` and tells `vfio-pci` to claim both RTX 3060 PCI functions.
 
-Bind the NVIDIA device 10de:2487 to vfio-pci aswell as the NVIDIA audio device 10de:228b
+### 4. Load VFIO Modules Early
 
+Check the existing module configuration:
 
-4. Make the VFIO load early
+```bash
+cat /etc/modules
+```
 
-Before rebuilding the initramfs, check Proxmox kernel modules configuration
+The Proxmox kernel indicates that `/etc/modules` is obsolete and has been replaced by `/etc/modules-load.d/`.
 
-`cat /etc/modules`
+Create the modern VFIO module configuration:
 
-# /etc/modules is obsolete and has been replaced by /etc/modules-load.d/.
-# Please see modules-load.d(5) and modprobe.d(5) for details.
-#
-# Updating this file still works, but it is undocumented and unsupported.
+```bash
+nano /etc/modules-load.d/vfio.conf
+```
 
-As we can see there's nothing here, this is where we will add the following vfio modules such as:
-- vfio
-- vfio_iommu_type1
-- vfio_pci
+Add:
 
-Save and Exit then run this command:
+```text
+vfio
+vfio_iommu_type1
+vfio_pci
+```
 
-`update-initramfs -u -k all`
+Rebuild the initramfs:
 
+```bash
+update-initramfs -u -k all
+```
+
+Example output:
+
+```text
 update-initramfs: Generating /boot/initrd.img-7.0.12-1-pve
 Running hook script 'zz-proxmox-boot'..
 Re-executing '/etc/kernel/postinst.d/zz-proxmox-boot' in new private mount namespace..
@@ -211,43 +343,85 @@ update-initramfs: Generating /boot/initrd.img-7.0.2-6-pve
 Running hook script 'zz-proxmox-boot'..
 Re-executing '/etc/kernel/postinst.d/zz-proxmox-boot' in new private mount namespace..
 No /etc/kernel/proxmox-boot-uuids found, skipping ESP sync.
+```
 
-One small cleanup
+### 5. Reboot the Proxmox Host
 
-Because Proxmox kernel explicitly says /etc/modules is obsolete, we prefer to put those VFIO modules in the modern location:
+Reboot the host so the new driver configuration takes effect:
 
-`nano /etc/modules-load.d/vfio.conf`
+```bash
+reboot
+```
 
-cat /etc/modules-load.d/vfio.conf 
-vfio 
-vfio_iommu_type1 
-vfio_pci
+### 6. Verify VFIO Took Ownership
 
-Then run the update-initramfs command again.
+After reboot, check the GPU:
 
-5. Reboot the Proxmox host
+```bash
+lspci -nnk -s 01:00.0
+```
 
-6. Verify VFIO took ownership
+Expected:
 
-root@pve-node1:~# lspci -nnk -s 01:00.0
+```text
 01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA104 [GeForce RTX 3060] [10de:2487] (rev a1)
         Subsystem: Micro-Star International Co., Ltd. [MSI] Device [1462:397d]
-        Kernel driver in use: **vfio-pci**
+        Kernel driver in use: vfio-pci
         Kernel modules: nvidiafb, nouveau, nova_core
-root@pve-node1:~# lspci -nnk -s 01:00.1
+```
+
+Check the GPU audio device:
+
+```bash
+lspci -nnk -s 01:00.1
+```
+
+Expected:
+
+```text
 01:00.1 Audio device [0403]: NVIDIA Corporation GA104 High Definition Audio Controller [10de:228b] (rev a1)
         Subsystem: Micro-Star International Co., Ltd. [MSI] Device [1462:397d]
-        Kernel driver in use: **vfio-pci**
+        Kernel driver in use: vfio-pci
         Kernel modules: snd_hda_intel
+```
 
-On lsmod we can literally see VFIO modules loaded and no nouveau module.
+Verify that VFIO modules are loaded and `nouveau` is no longer loaded:
 
-root@pve-node1:~# lsmod | grep -E 'nouveau|vfio'
+```bash
+lsmod | grep -E 'nouveau|vfio'
+```
+
+Output:
+
+```text
 vfio_pci               20480  0
 vfio_pci_core          94208  1 vfio_pci
 irqbypass              16384  2 vfio_pci_core,kvm
 vfio_iommu_type1       53248  0
 vfio                   73728  4 vfio_pci_core,vfio_iommu_type1,vfio_pci
 iommufd               131072  1 vfio
+```
 
-7. 
+The important result is:
+
+```text
+Kernel driver in use: vfio-pci
+```
+
+for both `01:00.0` and `01:00.1`, while `nouveau` is no longer loaded.
+
+### 7. VFIO Configuration Complete
+
+At this point, the Proxmox host-side GPU passthrough configuration is complete.
+
+The RTX 3060 is now:
+
+```text
+RTX 3060
+    ↓
+IOMMU Group 9
+    ↓
+vfio-pci
+    ↓
+Ready for VM PCI passthrough
+```
