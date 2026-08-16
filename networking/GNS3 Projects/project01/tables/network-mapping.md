@@ -48,5 +48,3 @@
 | webterm1 | eth0 | ACCESS1 | Gig0/3 |
 | webterm2 | eth0 | ACCESS2 | Gig0/3 |
 | webterm3 | eth0 | ACCESS3 | Gig0/3 |
-| webterm2 | eth0 | ACCESS3 | Gig0/3 |
-| webterm3 | eth0 | ACCESS2 | Gig0/3 |
