@@ -292,6 +292,15 @@ UUID=2af3-67bc    /database    ext4    defaults    0 0
 UUID/Filepath   MountPoint   FileSystem   MountOption   DumpFlag   FlagSystemCheckOrder
 ```
 
+**Always Apply changes**
+When we configure `/etc/fstab` we need to tell systemd to re-initialize the mount configuration on it. Use the following command:
+
+```bash
+sudo mount -a
+systemctl daemon-reload
+```
+The `sudo mount -a` mounts all filesystem listed in the file, as for `systemctl daemon-reload` This allows systemd to register the updated configuration.
+
 **Field 1**
 
 What is UUID?
