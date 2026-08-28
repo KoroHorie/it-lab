@@ -1,0 +1,12 @@
+enable
+[Password] Pa$$w0rd
+config t
+hostname FW1
+username admin password gns3lab2026
+domain-name gns3lab.local
+crypto key generate rsa general-keys modulus 2048
+aaa authentication ssh console LOCAL
+ssh 10.23.44.64 255.255.255.224 LAN1
+ssh timeout 10
+end
+write memory

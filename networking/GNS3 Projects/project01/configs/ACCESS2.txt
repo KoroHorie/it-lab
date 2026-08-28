@@ -1,0 +1,37 @@
+enable
+config t
+hostname ACCESS2
+
+vlan 65
+name IT
+vlan 95
+name NETLAB
+vlan 34
+name FACULTY
+vlan 36
+name SERVERS
+vlan 199
+name NATIVE
+exit
+
+interface range Gig0/3
+switchport mode access
+switchport access vlan 34
+spanning-tree portfast
+spanning-tree bpduguard enable
+switchport port-security
+switchport port-security maximum 1
+switchport port-security mac-address sticky
+exit
+
+interface range Gig0/0-1
+switchport mode trunk
+switchport trunk native vlan 199
+switchport trunk allowed vlan 34,36,65,95,199
+exit
+
+interface Vlan199
+ip address 10.23.44.83 255.255.255.224
+exit
+
+ip default-gateway 10.23.44.85

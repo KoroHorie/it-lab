@@ -1,0 +1,21 @@
+enable
+config t
+hostname ISP2
+
+interface Gig0/0
+description LINK-TO-FW2
+ip address 198.51.100.9 255.255.255.252
+no shutdown
+exit
+
+interface Gig0/1
+description LINK-TO-FW1
+ip address 198.51.100.13 255.255.255.252
+no shutdown
+exit
+
+interface Gig0/2
+description LINK-TO-EXTERNAL 
+ip address dhcp
+no shutdown
+exit

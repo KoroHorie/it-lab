@@ -1,0 +1,61 @@
+enable
+[ENTER]
+config t
+hostname FW1
+
+interface Gig0/0
+description LINK-TO-ISP1
+nameif WAN1
+security-level 0
+ip address 203.0.113.6 255.255.255.252
+no shutdown
+exit
+
+interface Gig0/1
+description LINK-TO-ISP2
+nameif WAN2
+security-level 0
+ip address 198.51.100.14 255.255.255.252
+no shutdown
+exit
+
+interface Gig0/2
+description LINK-TO-CORE1
+nameif LAN1
+security-level 100
+ip address 172.20.19.1 255.255.255.252
+no shutdown
+exit
+
+object network LAN-WAN1
+description LAN1-TO-WAN1
+subnet 10.23.0.0 255.255.192.0
+nat (LAN1,WAN1) dynamic interface
+
+object network LAN-WAN2
+description LAN1-TO-WAN2
+subnet 10.23.0.0 255.255.192.0
+nat (LAN1,WAN2) dynamic interface
+
+sla monitor 100
+type echo protocol ipIcmpEcho 8.8.8.8 interface outside
+num-packets 3
+frequency 10
+exit
+sla monitor schedule 100 life forever start-time now
+track 1 rtr 100 reachability
+
+class-map inspection_default
+match default-inspection-traffic
+
+policy-map global_policy
+class inspection_default
+inspect icmp
+exit
+
+service-policy global_policy global
+
+route WAN1 0.0.0.0 0.0.0.0 203.0.113.5 track 1
+route WAN2 0.0.0.0 0.0.0.0 198.51.100.13 5
+
+route LAN1 10.23.0.0 255.255.192.0 172.20.19.2

@@ -1,0 +1,97 @@
+enable
+config t
+hostname CORE1
+vlan 65
+name IT
+vlan 95
+name NETLAB
+vlan 34
+name FACULTY
+vlan 36
+name SERVERS
+vlan 199
+name NATIVE
+exit
+
+interface range Gig1/2
+switchport mode access
+switchport access vlan 36
+spanning-tree portfast
+spanning-tree bpduguard enable
+switchport port-security
+switchport port-security maximum 1
+switchport port-security mac-address sticky
+exit
+
+interface range Gig0/1-3
+switchport mode trunk
+switchport trunk native vlan 199
+switchport trunk allowed vlan 34,36,65,95,199
+exit
+
+interface range Gig1/0-1
+shutdown
+channel-protocol lacp
+channel-group 1 mode active
+no shutdown
+exit
+
+interface port-channel 1
+switchport mode trunk
+switchport trunk native vlan 199
+switchport trunk allowed vlan 34,36,65,95,199
+exit
+
+interface vlan 34
+ip address 10.23.42.255 255.255.252.0
+ip helper-address 10.23.44.5
+vrrp 34 ip 10.23.43.254
+vrrp 34 priority 254
+vrrp 34 preempt
+exit
+
+interface vlan 36
+ip address 10.23.44.61 255.255.255.192
+
+vrrp 36 ip 10.23.44.62
+vrrp 36 priority 254
+vrrp 36 preempt
+exit
+
+interface vlan 95
+ip address 10.23.38.255 255.255.248.0
+ip helper-address 10.23.44.5
+vrrp 95 ip 10.23.39.254
+vrrp 95 priority 254
+vrrp 95 preempt
+exit
+
+interface vlan 199
+ip address 10.23.44.80 255.255.255.224
+
+vrrp 199 ip 10.23.44.85
+vrrp 199 priority 254
+vrrp 199 preempt
+exit
+
+interface vlan 65
+ip address 10.23.30.255 255.255.224.0
+ip helper-address 10.23.44.5
+vrrp 65 ip 10.23.31.254
+vrrp 65 priority 200
+vrrp 65 preempt
+exit
+
+ip routing
+
+interface Gig0/0
+no switchport
+ip address 172.20.19.2 255.255.255.252
+no shutdown
+exit
+
+ip route 0.0.0.0 0.0.0.0 172.20.19.1
+
+spanning-tree mode rapid-pvst
+spanning-tree vlan 34,36,95,199 priority 0
+spanning-tree vlan 65 priority 61440

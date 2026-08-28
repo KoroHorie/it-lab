@@ -1,0 +1,117 @@
+from netmiko import ConnectHandler
+
+device = [
+        {
+                "name": "CORE1",
+                "device_type": "cisco_ios",
+                "host": "10.23.44.80",
+                "username": "admin",
+                "password": "gns3lab2026",
+                "secret": "gns3lab",
+                "config": [
+                        "interface g2/0",
+                        "no switchport",
+                        "ip address 172.20.19.14 255.255.255.252",
+                        "no shutdown",
+                        "exit",
+                        "ip route 0.0.0.0 0.0.0.0 172.20.19.13 5",
+                        "do write memory"
+                ]
+        },
+
+        {
+                "name": "CORE2",
+                "device_type": "cisco_ios",
+                "host": "10.23.44.81",
+                "username": "admin",
+                "password": "gns3lab2026",
+                "secret": "gns3lab",
+                "config": [
+                        "interface g2/0",
+                        "no switchport",
+                        "ip address 172.20.19.10 255.255.255.252",
+                        "no shutdown",
+                        "ip route 0.0.0.0 0.0.0.0 172.20.19.9 5",
+                        "do write memory"
+                ]
+        },
+]
+
+asa_device = [
+        {
+                "name": "FW1",
+                "device_type": "cisco_asa",
+                "host": "172.20.19.1",
+                "username": "admin",
+                "password": "gns3lab2026",
+                "secret": "Pa$$w0rd",
+                "config": [
+                        "interface g0/3",
+                        "ip address 172.20.19.9 255.255.255.252",
+                        "nameif LAN2",
+                        "security-level 100",
+                        "no shutdown",
+                        "exit",
+                        "object network LAN2-WAN2",
+                        "subnet 10.23.0.0 255.255.192.0",
+                        "nat (LAN2,WAN2) dynamic interface",
+                        "route LAN2 10.23.0.0 255.255.192.0 172.19.20.13 5",
+                        "object network LAN2-WAN1",
+                        "subnet 10.23.0.0 255.255.192.0",
+                        "nat (LAN2,WAN1) dynamic interface",
+                        "end"
+                        "write memory"
+                ]
+        },
+
+        {
+                "name": "FW2",
+                "device_type": "cisco_asa",
+                "host": "172.20.19.5",
+                "username": "admin",
+                "password": "gns3lab2026",
+                "secret": "Pa$$w0rd",
+                "config": [
+                        "interface g0/3",
+                        "ip address 172.20.19.13 255.255.255.252",
+                        "nameif LAN2",
+                        "security-level 100",
+                        "no shutdown",
+                        "exit",
+                        "object network LAN2-WAN2",
+                        "subnet 10.23.0.0 255.255.192.0",
+                        "nat (LAN2,WAN2) dynamic interface",
+                        "object network LAN2-WAN1",
+                        "subnet 10.23.0.0 255.255.192.0",
+                        "nat (LAN2,WAN1) dynamic interface",
+                        "route LAN2 10.23.0.0 255.255.192.0 5",
+                        "end"
+                        "write memory"
+                ]
+        }
+]
+
+def push_config(device):
+        print(f"\nConnecting to {device['name']}...")
+
+        conn = ConnectHandler(
+                device_type=device["device_type"],
+                host=device["host"],
+                username=device["username"],
+                password=device["password"],
+                secret=device["secret"]
+        )
+
+        conn.enable()
+        output = conn.send_config_set(device["config"])
+
+        print(output)
+        print(f"{device['name']} done.\n")
+
+for d in device:
+        push_config(d)
+
+for d in asa_device:
+        push_config(d)
+
+print("All devices configured successfully.")

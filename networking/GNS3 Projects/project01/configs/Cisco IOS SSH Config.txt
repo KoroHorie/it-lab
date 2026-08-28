@@ -1,0 +1,15 @@
+enable
+config t
+ip domain name gns3lab.local
+no ip domain lookup
+username admin secret gns3lab2026
+enable secret gns3lab
+crypto key generate rsa general-keys modulus 2048
+ip ssh version 2
+line vty 0 4
+login local
+transport input ssh
+end
+
+copy run start
+write memory
